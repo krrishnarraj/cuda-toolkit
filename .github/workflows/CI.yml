@@ -34,6 +34,12 @@ jobs:
             ubuntu-22.04-arm
           ]
         method: [local, network]
+        exclude:
+          # The full local installer is ~3.9 GB on Windows ARM64 and Windows
+          # runners bypass the GitHub cache in this action, so every run
+          # would re-download it. ARM64 is covered via network + nvcc below.
+          - os: windows-11-arm
+            method: local
     runs-on: ${{ matrix.os }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -65,6 +71,8 @@ jobs:
         run: npm run ci-test
 
       - name: Run the action on this runner with method ${{matrix.method}}
+        # Skipped on Windows ARM64: covered by the network + nvcc step below
+        if: matrix.os != 'windows-11-arm'
         uses: ./
         with:
           method: ${{matrix.method}}
