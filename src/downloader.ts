@@ -168,7 +168,7 @@ async function getDownloadURL(method: string, version: SemVer): Promise<URL> {
           `Network mode is not supported by linux, shouldn't even get here`
         )
       }
-      return links.getNetworkURLFromCudaVersion(version)
+      return await links.getNetworkURLFromCudaVersion(version)
     default:
       throw new Error(
         `Invalid method: expected either 'local' or 'network', got '${method}'`

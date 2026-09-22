@@ -80252,6 +80252,14 @@ class WindowsLinks extends AbstractLinks {
     static _instance;
     cudaVersionToNetworkUrl = new Map([
         [
+            '13.4.2',
+            'https://developer.download.nvidia.com/compute/cuda/13.4.2/network_installers/cuda_13.4.2_windows_x86_64_network.exe'
+        ],
+        [
+            '13.4.1',
+            'https://developer.download.nvidia.com/compute/cuda/13.4.1/network_installers/cuda_13.4.1_windows_x86_64_network.exe'
+        ],
+        [
             '13.3.1',
             'https://developer.download.nvidia.com/compute/cuda/13.3.1/network_installers/cuda_13.3.1_windows_network.exe'
         ],
@@ -80512,7 +80520,17 @@ class WindowsLinks extends AbstractLinks {
     constructor() {
         super();
         // Map of cuda SemVer version to download URL
+        // NOTE: Stored URLs are the x86_64 variants. ARM64 URLs are derived in
+        // getLocalURLFromCudaVersion/getNetworkURLFromCudaVersion via getArch().
         this.cudaVersionToURL = new Map([
+            [
+                '13.4.2',
+                'https://developer.download.nvidia.com/compute/cuda/13.4.2/local_installers/cuda_13.4.2_windows_x86_64.exe'
+            ],
+            [
+                '13.4.1',
+                'https://developer.download.nvidia.com/compute/cuda/13.4.1/local_installers/cuda_13.4.1_windows_x86_64.exe'
+            ],
             [
                 '13.3.1',
                 'https://developer.download.nvidia.com/compute/cuda/13.3.1/local_installers/cuda_13.3.1_windows.exe'
@@ -80774,16 +80792,44 @@ class WindowsLinks extends AbstractLinks {
     static get Instance() {
         return this._instance || (this._instance = new this());
     }
+    async getLocalURLFromCudaVersion(version) {
+        const link = await super.getLocalURLFromCudaVersion(version);
+        const arch = await getArch();
+        if (arch === CPUArch.arm64) {
+            return new URL(toArm64WindowsUrl(link.toString(), version));
+        }
+        return link;
+    }
     getAvailableNetworkCudaVersions() {
         return Array.from(this.cudaVersionToNetworkUrl.keys()).map((s) => new semverExports.SemVer(s));
     }
-    getNetworkURLFromCudaVersion(version) {
+    async getNetworkURLFromCudaVersion(version) {
         const urlString = this.cudaVersionToNetworkUrl.get(`${version}`);
         if (urlString === undefined) {
             throw new Error(`Invalid version: ${version}`);
         }
+        const arch = await getArch();
+        if (arch === CPUArch.arm64) {
+            return new URL(toArm64WindowsUrl(urlString, version));
+        }
         return new URL(urlString);
     }
+}
+/**
+ * Derives the Windows ARM64 installer URL from the stored x86_64 URL.
+ * Windows ARM64 is only supported starting with CUDA 13.4.1, where NVIDIA
+ * publishes separate `..._windows_x86_64...exe` and
+ * `..._windows_arm64...exe` installers. Older versions (including 12.9.2,
+ * whose network URL happens to contain an x86_64 marker but has no ARM64
+ * counterpart) throw a descriptive error.
+ */
+function toArm64WindowsUrl(x86_64Url, version) {
+    const arm64SupportedSince = new semverExports.SemVer('13.4.1');
+    if (version.compare(arm64SupportedSince) >= 0 &&
+        x86_64Url.includes('_windows_x86_64')) {
+        return x86_64Url.replace('_windows_x86_64', '_windows_arm64');
+    }
+    throw new Error(`CUDA version ${version} is not available for Windows ARM64. Windows ARM64 requires CUDA 13.4.1 or newer.`);
 }
 
 /**
@@ -80797,6 +80843,14 @@ class LinuxLinks extends AbstractLinks {
         super();
         // Map of cuda SemVer version to download URL
         this.cudaVersionToURL = new Map([
+            [
+                '13.4.2',
+                'https://developer.download.nvidia.com/compute/cuda/13.4.2/local_installers/cuda_13.4.2_linux.run'
+            ],
+            [
+                '13.4.1',
+                'https://developer.download.nvidia.com/compute/cuda/13.4.1/local_installers/cuda_13.4.1_linux.run'
+            ],
             [
                 '13.3.1',
                 'https://developer.download.nvidia.com/compute/cuda/13.3.1/local_installers/cuda_13.3.1_610.43.02_linux.run'
@@ -81261,7 +81315,7 @@ async function getDownloadURL(method, version) {
                 coreExports.debug(`Tried to get windows links but got linux links instance`);
                 throw new Error(`Network mode is not supported by linux, shouldn't even get here`);
             }
-            return links.getNetworkURLFromCudaVersion(version);
+            return await links.getNetworkURLFromCudaVersion(version);
         default:
             throw new Error(`Invalid method: expected either 'local' or 'network', got '${method}'`);
     }

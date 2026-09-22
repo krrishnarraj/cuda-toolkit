@@ -1,4 +1,5 @@
 import { AbstractLinks } from './links.js'
+import { CPUArch, getArch } from '../arch.js'
 import { SemVer } from 'semver'
 
 // # Dictionary of known cuda versions and thier download URLS, which do not follow a consistent pattern :(
@@ -24,6 +25,14 @@ export class WindowsLinks extends AbstractLinks {
   private static _instance: WindowsLinks
 
   private cudaVersionToNetworkUrl: Map<string, string> = new Map([
+    [
+      '13.4.2',
+      'https://developer.download.nvidia.com/compute/cuda/13.4.2/network_installers/cuda_13.4.2_windows_x86_64_network.exe'
+    ],
+    [
+      '13.4.1',
+      'https://developer.download.nvidia.com/compute/cuda/13.4.1/network_installers/cuda_13.4.1_windows_x86_64_network.exe'
+    ],
     [
       '13.3.1',
       'https://developer.download.nvidia.com/compute/cuda/13.3.1/network_installers/cuda_13.3.1_windows_network.exe'
@@ -286,7 +295,17 @@ export class WindowsLinks extends AbstractLinks {
   private constructor() {
     super()
     // Map of cuda SemVer version to download URL
+    // NOTE: Stored URLs are the x86_64 variants. ARM64 URLs are derived in
+    // getLocalURLFromCudaVersion/getNetworkURLFromCudaVersion via getArch().
     this.cudaVersionToURL = new Map([
+      [
+        '13.4.2',
+        'https://developer.download.nvidia.com/compute/cuda/13.4.2/local_installers/cuda_13.4.2_windows_x86_64.exe'
+      ],
+      [
+        '13.4.1',
+        'https://developer.download.nvidia.com/compute/cuda/13.4.1/local_installers/cuda_13.4.1_windows_x86_64.exe'
+      ],
       [
         '13.3.1',
         'https://developer.download.nvidia.com/compute/cuda/13.3.1/local_installers/cuda_13.3.1_windows.exe'
@@ -550,17 +569,51 @@ export class WindowsLinks extends AbstractLinks {
     return this._instance || (this._instance = new this())
   }
 
+  override async getLocalURLFromCudaVersion(version: SemVer): Promise<URL> {
+    const link = await super.getLocalURLFromCudaVersion(version)
+    const arch: CPUArch = await getArch()
+    if (arch === CPUArch.arm64) {
+      return new URL(toArm64WindowsUrl(link.toString(), version))
+    }
+    return link
+  }
+
   getAvailableNetworkCudaVersions(): SemVer[] {
     return Array.from(this.cudaVersionToNetworkUrl.keys()).map(
       (s) => new SemVer(s)
     )
   }
 
-  getNetworkURLFromCudaVersion(version: SemVer): URL {
+  async getNetworkURLFromCudaVersion(version: SemVer): Promise<URL> {
     const urlString = this.cudaVersionToNetworkUrl.get(`${version}`)
     if (urlString === undefined) {
       throw new Error(`Invalid version: ${version}`)
     }
+    const arch: CPUArch = await getArch()
+    if (arch === CPUArch.arm64) {
+      return new URL(toArm64WindowsUrl(urlString, version))
+    }
     return new URL(urlString)
   }
+}
+
+/**
+ * Derives the Windows ARM64 installer URL from the stored x86_64 URL.
+ * Windows ARM64 is only supported starting with CUDA 13.4.1, where NVIDIA
+ * publishes separate `..._windows_x86_64...exe` and
+ * `..._windows_arm64...exe` installers. Older versions (including 12.9.2,
+ * whose network URL happens to contain an x86_64 marker but has no ARM64
+ * counterpart) throw a descriptive error.
+ */
+function toArm64WindowsUrl(x86_64Url: string, version: SemVer): string {
+  const arm64SupportedSince = new SemVer('13.4.1')
+  if (
+    version.compare(arm64SupportedSince) >= 0 &&
+    x86_64Url.includes('_windows_x86_64')
+  ) {
+    return x86_64Url.replace('_windows_x86_64', '_windows_arm64')
+  }
+  throw new Error(
+    `CUDA version ${version} is not available for Windows ARM64. Windows ARM64 requires CUDA 13.4.1 or newer.`
+  )
 }
