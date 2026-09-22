@@ -15,7 +15,7 @@ been tested to work successfully.
 **Optional** The CUDA version to install. View `src/link/windows-links.ts` and
 `src/link/linux-links.ts` for available versions.
 
-Default: `'13.2.0'`.
+Default: `'13.4.2'`.
 
 ### `sub-packages`
 
@@ -109,7 +109,7 @@ steps:
 - uses: Jimver/cuda-toolkit@v0.2.36
   id: cuda-toolkit
   with:
-    cuda: '13.2.0'
+    cuda: '13.4.2'
 
 - run: echo "Installed cuda version is: ${{steps.cuda-toolkit.outputs.cuda}}"
 
