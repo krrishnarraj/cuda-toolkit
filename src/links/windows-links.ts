@@ -26,6 +26,10 @@ export class WindowsLinks extends AbstractLinks {
 
   private cudaVersionToNetworkUrl: Map<string, string> = new Map([
     [
+      '13.4.3',
+      'https://developer.download.nvidia.com/compute/cuda/13.4.3/network_installers/cuda_13.4.3_windows_x86_64_network.exe'
+    ],
+    [
       '13.4.2',
       'https://developer.download.nvidia.com/compute/cuda/13.4.2/network_installers/cuda_13.4.2_windows_x86_64_network.exe'
     ],
@@ -298,6 +302,10 @@ export class WindowsLinks extends AbstractLinks {
     // NOTE: Stored URLs are the x86_64 variants. ARM64 URLs are derived in
     // getLocalURLFromCudaVersion/getNetworkURLFromCudaVersion via getArch().
     this.cudaVersionToURL = new Map([
+      [
+        '13.4.3',
+        'https://developer.download.nvidia.com/compute/cuda/13.4.3/local_installers/cuda_13.4.3_windows_x86_64.exe'
+      ],
       [
         '13.4.2',
         'https://developer.download.nvidia.com/compute/cuda/13.4.2/local_installers/cuda_13.4.2_windows_x86_64.exe'
